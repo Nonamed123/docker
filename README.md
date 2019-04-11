@@ -15,6 +15,55 @@ docker volume prune
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
 
+
+# Homework 19 Gitlab-CI-1
+## 19.1 Что было сделано
+создана ВМ в GCP, установлен docker-ce, docker-compose
+в каталоге /srv/gitlab/ создан docker-compose.yml с описанием gitlab-ci:
+web:
+  image: 'gitlab/gitlab-ce:latest'
+  restart: always
+  hostname: 'gitlab.example.com'
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url 'http://35.187.88.136'
+  ports:
+    - '80:80'
+    - '443:443'
+    - '2222:22'
+  volumes:
+    - '/srv/gitlab/config:/etc/gitlab'
+    - '/srv/gitlab/logs:/var/log/gitlab'
+    - '/srv/gitlab/data:/var/opt/gitlab'
+    
+запущен gitlab-ci:
+docker-compose up -d 
+созданы группа и проект в gitlab-ci
+
+добавлен remote в _microservices:
+git checkout -b gitlab-ci-1
+git remote add gitlab http://<your-vm-ip>/homework/example.git
+git push gitlab gitlab-ci-1
+создан файл .gitlab-ci.yml с описанием пайплайна
+создан и зарегистрирован runner:
+docker run -d --name gitlab-runner --restart always \
+    -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    gitlab/gitlab-runner:latest 
+docker exec -it gitlab-runner gitlab-runner register
+добавлен исходный код reddit в репозиторий:
+git clone https://github.com/express42/reddit.git && rm -rf ./reddit/.git
+git add reddit/
+git commit -m “Add reddit app”
+git push gitlab gitlab-ci-1
+в описание pipeline добавлен вызов теста в файле simpletest.rb
+добавлена библиотека для тестирования в reddit/Gemfile приложения
+теперь на каждое изменение в коде приложения будет запущен тест
+Интеграция со slack чатом:
+
+Project Settings > Integrations > Slack notifications. Нужно установить active, выбрать события и заполнить поля с URL Slack webhook
+ссылка на тестовый канал https://nonamed-hq.slack.com/archives/CF2BB9CHG/p1554983084000200
+
 # Homework 17 Docker-4#
 
 ## 17.1 Что было сделано
