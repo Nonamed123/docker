@@ -15,6 +15,46 @@ docker volume prune
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
 
+# Homework 20 Gitlab-CI-2
+## 20.1 Что было сделано
+
+    создан новый проект в gitlab-ci
+    добавлен новый remote в _microservices:
+
+git checkout -b gitlab-ci-2
+git remote add gitlab2 http://<your-vm-ip>/homework/example2.git
+git push gitlab2 gitlab-ci-2
+
+    для нового проекта активирован сущестующий runner
+    пайплайн изменен таким образом, чтобы job deploy стал определением окружения dev, на которое условно будет выкатываться каждое изменение в коде проекта
+    определены два новых этапа: stage и production, первый будет содержать job имитирующий выкатку на staging окружение, второй на production окружение
+    staging и production запускаются с кнопки (when: manual)
+    в описание pipeline добавлена директива, которая не позволит нам выкатить на staging и production код, не помеченный с помощью тэга в git:
+
+...
+staging:
+  stage: stage
+  when: manual
+  only:
+    - /^\d+\.\d+\.\d+/
+  script:
+    - echo 'Deploy'
+  environment:
+    name: stage
+    url: https://beta.example.com
+...
+
+    в описание pipeline добавлены динамические окружения, теперь на каждую ветку в git отличную от master Gitlab CI будет определять новое окружение
+
+## 20.2 Как запустить проект
+
+на машине с gitlab-ci в каталоге /srv/gitlab/:
+
+docker-compose up -d
+
+## 20.3 Как проверить
+
+перейти в браузере по ссылке http://docker-host_ip
 
 # Homework 19 Gitlab-CI-1
 ## 19.1 Что было сделано
