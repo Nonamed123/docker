@@ -1,0 +1,86 @@
+version: '3.3'
+services:
+
+  mongo_db:
+    image: mongo:3.2
+    volumes:
+      - post_db:/data/db
+    networks:
+      front_net:
+        aliases:
+          - post_db
+          - comment_db
+
+  prometheus:
+    env_file: .env
+    image: ${USER_NAME}/prometheus:latest
+    volumes:
+      - prom_db:/data/prom_db
+    networks:
+      - front_net
+      - back_net
+    ports:
+      - '9090:9090'
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.0
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - front_net
+      - back_net
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+ 
+  mongodb-exporter:
+    env_file: .env
+    image: eses/mongodb_exporter:latest
+    environment:
+      - MONGODB_URL='mongodb://comment_db:27017'
+      - MONGODB_URL='mongodb://post_db:27017'
+    networks:
+      - front_net
+      - back_net
+
+#  cloudprober-exporter:
+#    image: ${USERNAME}/cloudprober:latest
+#    networks:
+#      - front_net
+#    container_name: cloudprober-exporter
+ 
+  ui:
+#    build: ./ui
+    env_file: .env   
+    image: ${USERNAME}/ui
+    ports:
+      - ${UI_PORT}:${UI_PORT}/tcp
+#      - 9292:9292/tcp  
+    networks:
+      - front_net
+  post:
+#    build: ./post-py
+    env_file: .env
+    image: ${USERNAME}/post:logging
+    networks:
+      - front_net
+      - back_net
+  comment:
+#    build: ./comment
+    env_file: .env
+    image: ${USERNAME}/comment
+    networks:
+      - front_net
+      - back_net
+ 
+
+volumes:
+  post_db:
+  prom_db:
+networks:
+  back_net:
+  front_net:
