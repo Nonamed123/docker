@@ -15,7 +15,7 @@ docker volume prune
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
 
-# Homework 18 Monitoring-1
+# Homework 21 Monitoring-1
 ## 21.1 Что было сделано
 создано правило фаервола для Prometheus и Puma:
 gcloud compute firewall-rules create prometheus-default --allow tcp:9090
