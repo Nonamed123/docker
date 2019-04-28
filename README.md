@@ -15,6 +15,71 @@ docker volume prune
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
 
+# Homework 21 Monitoring-1
+## 21.1 Что было сделано
+создано правило фаервола для Prometheus и Puma:
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+создан Docker хост в GCE и настроено локальное окружение на работу с ним:
+$ export GOOGLE_PROJECT=_ваш-проект_
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west1-b \
+    docker-host
+eval $(docker-machine env docker-host)
+$ docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
+переупорядочена структура директорий (созданы директории docker и monitoring, в docker перенесены директория docker-monolith и файлы docker-compose.* и все .env)
+создан monitoring/prometheus/Dockerfile который будет копировать файл конфигурации с нашей машины внутрь контейнера:
+FROM prom/prometheus:v2.1.0
+ADD prometheus.yml /etc/prometheus/
+в директории monitoring/prometheus создан конфигурационный файл prometheus.yml
+в директории prometheus собран Docker образ
+$ export USER_NAME=username
+$ docker build -t $USER_NAME/prometheus .
+выполнена сборка образов при помощи скриптов docker_build.sh в директории каждого сервиса:
+/src/ui      $ bash docker_build.sh
+/src/post-py $ bash docker_build.sh
+/src/comment $ bash docker_build.sh
+определен новый сервис Prometheus в docker/docker-compose.yml, удалены build директивы из docker_compose.yml и использованы директивы image
+добавлена секция networks в определение сервиса Prometheus в docker/dockercompose.yml
+подняты сервисы, определенные в docker/dockercompose.yml, протестирована работа Prometheus
+определен еще один сервис node-exporter в docker/docker-compose.yml файле для сбора информации о работе Docker хоста (виртуалки, где у нас запущены контейнеры) и предоставлению этой информации в Prometheus
+информация о сервисе node-exporter добавлена в конфиг Prometheus, создан новый образ
+scrape_configs:
+...
+ - job_name: 'node'
+ static_configs:
+ - targets:
+ - 'node-exporter:9100' 
+#
+monitoring/prometheus $ docker build -t $USER_NAME/prometheus .
+сервисы перезапущены
+$ docker-compose down
+$ docker-compose up -d 
+работа экспортера протестирована на примере информации об использовании CPU
+собранные образы запушены на DockerHub:
+$ docker login
+$ docker push $USER_NAME/ui
+$ docker push $USER_NAME/comment
+$ docker push $USER_NAME/post
+$ docker push $USER_NAME/prometheus
+ссылка на DockerHub - https://hub.docker.com/u/statusxt/
+В рамках задания со *:
+
+в Prometheus добавлен мониторинг MongoDB с использованием percona/mongodb_exporter, Dockerfile в каталоге monitoring/mongodb_exporter
+добавлен мониторинг сервисов comment, post, ui с помощью blackbox экспортера prom/blackbox-exporter, Dockerfile и конфиг в каталоге monitoring/blackbox_exporter
+создан Makefile с возможностями: build, push, pull, remove, start, stop; билд конкретного образа - make -e IMAGE_PATHS=./src/post-py
+## 21.2 Как запустить проект
+в каталоге /docker/:
+docker-compose up -d
+в рамках задания со звездочкой - в корне репозитория:
+make build
+make start
+make push
+## 21.3 Как проверить
+перейти в браузере по ссылке http://docker-host_ip:9090
+
 # Homework 20 Gitlab-CI-2
 ## 20.1 Что было сделано
 

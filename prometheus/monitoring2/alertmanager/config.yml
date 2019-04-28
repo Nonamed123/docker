@@ -1,0 +1,12 @@
+global:
+  slack_api_url: "https://hooks.slack.com/services/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"
+
+route:
+  receiver: 'slack-notifications'
+
+receivers:
+- name: "slack-notifications"
+  slack_configs:
+  - channel: "#devops"
+    
+
