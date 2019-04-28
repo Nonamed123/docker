@@ -14,6 +14,100 @@ docker volume prune
 С другой стороны, висящее изображение просто означает, что вы создали новую сборку изображения, но ему не дали новое имя. Таким образом, старые образы, которые у вас есть, становятся «висячим образом». Эти старые изображения являются непомеченными и отображают " <none>" на своем имени при запуске docker images.
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
+# Homework 23 Monitoring-2
+## 23.1 Что было сделано
+
+    созданы правила фаервола для Prometheus, Puma, Cadvisor, Grafana:
+
+gcloud compute firewall-rules create prometheus-default --allow tcp:9090
+gcloud compute firewall-rules create puma-default --allow tcp:9292
+gcloud compute firewall-rules create cadvisor-default --allow tcp:8080
+gcloud compute firewall-rules create grafana-default --allow tcp:3000
+
+    создан Docker хост в GCE и настроено локальное окружение на работу с ним:
+
+export GOOGLE_PROJECT=_ваш-проект_
+docker-machine create --driver google \
+    --google-machine-image https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts \
+    --google-machine-type n1-standard-1 \
+    --google-zone europe-west1-b \
+    docker-host
+eval $(docker-machine env docker-host)
+docker run --rm -p 9090:9090 -d --name prometheus  prom/prometheus
+
+    мониторинг выделен в отдельный файл docker-compose-monitoring.yml
+    добавлен новый сервис cadvisor в компоуз файл мониторинга docker-composemonitoring.yml
+    запущен сервис grafana
+
+docker-compose -f docker-compose-monitoring.yml up -d grafana
+
+    пересобран образ Prometheus с обновленной конфигурацией, запущены сервисы:
+
+$ export USER_NAME=username
+$ docker build -t $USER_NAME/prometheus .
+$ docker-compose up -d
+$ docker-compose -f docker-compose-monitoring.yml up -d
+
+    проверена работа cadvisor
+    добавлен новый сервис grafana в компоуз файл мониторинга docker-compose-monitoring.yml
+    в grafana через webUI добавлен источник данных prometheus
+    работа grafana протестирована, json файлы дашбордов в директории monitoring/grafana/dashboards
+    подняты сервисы, определенные в docker/dockercompose.yml, протестирована работа Prometheus
+    определен еще один сервис alertmanager (monitoring/Dockerfile)
+    в директории monitoring/alertmanager создан файл config.yml, в котором определена отправка нотификаций в тестовый слак канал
+    собран образ alertmanager
+
+docker build -t $USER_NAME/alertmanager .
+
+    добавлен новый сервис alertmanager в компоуз файл мониторинга docker-composemonitoring.yml
+    создан файл alerts.yml в директории prometheus
+
+groups:
+  - name: alert.rules
+    rules:
+    - alert: InstanceDown
+      expr: up == 0
+      for: 1m
+      labels:
+        severity: page
+      annotations:
+        description: '{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute'
+        summary: 'Instance {{ $labels.instance }} down'
+
+    операцию копирования данного файла добавлена в Dockerfile (ADD alerts.yml /etc/prometheus/)
+    информацию о правилах добавлена в конфиг Prometheus
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "alertmanager:9093"
+
+    пересобран образ Prometheus, пересоздана Docker инфраструктура мониторинга:
+
+docker build -t $USER_NAME/prometheus .
+docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f docker-compose-monitoring.yml up -d
+
+    работа alertmanager протестирована
+    образы запушены на dockerhub - https://hub.docker.com/u/statusxt/
+
+## 23.2 Как запустить проект
+
+    в каталоге /docker:
+
+docker-compose up -d
+docker-compose -f docker-compose-monitoring.yml up -d
+
+## 23.3 Как проверить
+
+    перейти в браузере по ссылке http://docker-host_ip:3000 (grafana)
+    перейти в браузере по ссылке http://docker-host_ip:9090 (prometheus)
+    перейти в браузере по ссылке http://docker-host_ip:8080 (cadvisor)
 
 # Homework 21 Monitoring-1
 ## 21.1 Что было сделано
