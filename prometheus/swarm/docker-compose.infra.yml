@@ -1,0 +1,164 @@
+version: '3.3'
+services:
+
+  prometheus:
+    env_file: .env
+    image: ${USER_NAME}/prometheus:latest
+    volumes:
+      - prom_db:/data/prom_db
+    networks:
+      - front_net
+      - back_net
+    ports:
+      - '9090:9090'
+
+  node-exporter:
+    image: prom/node-exporter:v0.15.0
+    deploy:
+      mode: global 
+    user: root
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - front_net
+      - back_net
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points="^/(sys|proc|dev|host|etc)($$|/)"'
+
+  stackdriver_exporter:
+    env_file: .env
+    image: ${USERNAME}/stackdriver_exporter
+    ports:
+      - '9255:9255'
+    networks:
+      - back_net
+      - front_net
+    command:
+       - '--monitoring.metrics-type-prefixes="compute.googleapis.com/instance/cpu,compute.googleapis.com/instance/disk"'
+    container_name: stackdriver_exporter
+    hostname: stackdriver_exporter
+
+  mongodb_exporter:
+    env_file: .env
+    image: ${USERNAME}/mongodb_exporter:latest
+    environment:
+      - MONGODB_URL='mongodb://comment_db:27017'
+      - MONGODB_URL='mongodb://post_db:27017'
+    networks:
+      - front_net
+      - back_net
+
+  blackbox_exporter:
+    image: ${USERNAME}/blackbox_exporter
+    networks:
+      front_net:
+      back_net:
+  cloudprober-exporter:
+    image: ${USERNAME}/cloudprober-exporter:latest
+    networks:
+      - front_net
+      - back_net
+    container_name: cloudprober-exporter
+
+  cadvisor:
+    image: google/cadvisor:v0.29.0
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:rw'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    ports:
+      - '8080:8080'
+    networks:
+      back_net:
+        aliases:
+          - cadvisor
+
+  grafana:
+    image: grafana/grafana:5.0.0
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    networks:
+      back_net:
+        aliases:
+          - grafana
+
+  alertmanager:
+    image: ${USERNAME}/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+    ports:
+      - 9093:9093
+    networks:
+      back_net:
+        aliases:
+          - alertmanager
+#  fluentd:
+#    image: ${USERNAME}/fluentd
+#    ports:
+#      - "24224:24224"
+#      - "24224:24224/udp"
+#    networks:
+#      - front_net
+#      - back_net
+
+#  elasticsearch:
+#     image: "docker.elastic.co/elasticsearch/elasticsearch:7.0.0"
+#     environment:
+#       - "discovery.type=single-node"
+#     ports:
+#       - "9200:9200"
+#       - "9300:9300"
+#     networks:
+#      - front_net
+#      - back_net
+#     container_name: elasticsearch
+
+
+#  kibana:
+#    image: "docker.elastic.co/kibana/kibana:7.0.0"
+#    container_name: "kibana"
+#    environment:
+#      - "ELASTICSEARCH_URL=http://elasticsearch:9200"
+
+#      - "XPACK_GRAPH_ENABLED=false"
+#      - "XPACK_ML_ENABLED=false"
+#      - "XPACK_REPORTING_ENABLED=false"
+#      - "XPACK_SECURITY_ENABLED=false"
+#      - "XPACK_WATCHER_ENABLED=false"
+#    command:
+#      - '--link elasticsearch:elasticsearch'
+#    ports:
+#      - "5601:5601"
+#    networks:
+#      - front_net
+#      - back_net
+#    restart: "unless-stopped"
+
+#  zipkin:
+#    image: openzipkin/zipkin
+#    container_name: zipkin
+#    ports:
+#      - "9411:9411"
+#    networks:
+#      - front_net
+#      - back_net
+
+volumes:
+  prom_db:
+  grafana_data:
+networks:
+  back_net:
+  front_net:
+
