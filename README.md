@@ -45,7 +45,8 @@ $ docker node ls
 действий со значениями label-ов (медатанных) нод
 и docker-engine’ов
 Запущена инфраструктура с мониторингом созданы несколько окружений.
-
+env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --with-registry-auth --compose-file docker-compose.yml name stacr
+This comand for othe connect stack name.
 # Homework 24 Logging-1
 ## 24.1 Что было сделано
 
