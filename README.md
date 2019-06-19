@@ -15,6 +15,70 @@ docker volume prune
 
 При запуске docker system prune -aон удалит неиспользуемые и свисающие изображения. Поэтому любые изображения, используемые в контейнере, вне зависимости от того, были ли они завершены или запущены в данный момент, НЕ будут затронуты.
 
+# Homework 30 Kubernetes-3
+## 30.1 Что было сделано
+
+    Проверена работа kube-dns:
+
+kubectl scale deployment --replicas 0 -n kube-system kube-dns-autoscaler
+kubectl scale deployment --replicas 0 -n kube-system kube-dns
+kubectl exec -ti -n dev <имя любого pod-а> ping comment
+kubectl scale deployment --replicas 1 -n kube-system kube-dnsautoscaler
+
+    Service UI настроен как LoadBalancer. Недостатки: нельзя управлять с помощью http URI (L7-балансировка), используются только облачные балансировщики (AWS, GCP), нет гибких правил работы с трафиком.
+    создан Ingress для сервиса UI, LoadBalancer убран из ui-service.yml
+    сервис защищен с помощью TLS, ui-ingress.yml настроен на прием только HTTPS траффика:
+
+kubectl get ingress -n dev
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=35.227.210.219"
+kubectl create secret tls ui-ingress --key tls.key --cert tls.crt -n dev
+kubectl describe secret ui-ingress -n dev
+kubectl delete ingress ui -n dev
+kubectl apply -f ui-ingress.yml -n dev
+
+    создан mongo-network-policy.yml, разрешен доступ к mongo с post и comment
+
+kubectl apply -f mongo-network-policy.yml -n dev
+
+    создан диск в Google Cloud, добавлен новый Volume POD-у базы (gcePersistentDisk). Проверено, что теперь при пересоздании пода данные в базе не теряются.
+    создано описание PersistentVolume mongo-volume.yml (ресурс дискового хранилища, распространенный на весь кластер, в виде PersistentVolume)
+    создан запрос на выдачу - PersistentVolumeClaim mongo-claim.yml, чтобы выделить приложению часть ресурса PersistentVolume
+    PVC подключен к нашим Pod'ам:
+
+mongo-deployment.yml
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+ name: mongo
+...
+  spec:
+    containers:
+    - image: mongo:3.2
+      name: mongo
+      volumeMounts:
+      - name: mongo-persistent-storage
+        mountPath: /data/db
+    volumes:
+    - name: mongo-persistent-storage
+      persistentVolumeClaim:
+        claimName: mongo-pvc
+
+    создан StorageClass Fast storage-fast.yml так, чтобы монтировались SSD-диски для работы нашего хранилища
+    создано описание PersistentVolumeClaim mongo-claim-dynamic.yml
+    динамический PVC подключен к нашим Pod'ам (claimName: mongo-pvc-dynamic)
+
+## 30.2 Как запустить проект
+
+    в каталоге /kubernetes/reddit:
+
+kubectl apply -f dev-namespace.yml
+kubectl apply -f . -n dev
+
+## 30.3 Как проверить
+
+    перейти в браузере по ссылке https://ingress-ip
+
 # Homework 29 (kubernetes-2)
 
 Build Status
